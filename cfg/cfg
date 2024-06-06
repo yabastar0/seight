@@ -1,0 +1,6 @@
+{
+    {"gfx/fex.nfp","fex 1","fex.lua"},
+    {"gfx/gear.nfp","sttngs","sttngs.lua"},
+    {"gfx/sysinfo.nfp","sysdat","sysdat.lua"},
+    {"gfx/term.nfp","termnl","term.lua"},
+} -- desktop
