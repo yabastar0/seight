@@ -248,14 +248,18 @@ local function menu(opts)
     term.setCursorPos(x2, y2)
 end
 
-local function seclr()
+local function seclr(xs,ys,xw,yw)
     local x2, y2 = term.getCursorPos()
     local text = term.getTextColor()
     local bg = term.getBackgroundColor()
     term.setTextColor(colors.white)
     term.setBackgroundColor(colors.black)
-    for i = 1, x do
-        for i2 = 1, y do
+    local xw = xw or x
+    local yw = yw or y
+    local xs = xs or 1
+    local ys = ys or 1
+    for i = xs, xw do
+        for i2 = ys, yw do
             term.setCursorPos(i, i2)
             term.write(string.char(0x7F))
         end
@@ -294,36 +298,126 @@ function trunc(str, size)
     end
 end
 
-local termWidth, termHeight = term.getSize()
+local function redrawIcons()
+    local termWidth, termHeight = term.getSize()
 
-local startX = 3
-local startY = 3
-local currentX = startX
-local currentY = startY
+    local startX = 3
+    local startY = 3
+    local currentX = startX
+    local currentY = startY
 
-local imageWidth = 5
-local imageHeight = 3
-local labelY = 6
+    local imageWidth = 5
+    local imageHeight = 3
+    local labelY = 6
 
-for k, v in ipairs(loc) do
-    if currentX + imageWidth > termWidth then
-        currentX = startX
-        currentY = currentY + imageHeight + 3 -- Adjust this if you want more spacing
+    for k, v in ipairs(loc) do
+        if currentX + imageWidth > termWidth then
+            currentX = startX
+            currentY = currentY + imageHeight + 3 -- Adjust this if you want more spacing
+        end
+
+        local pinestore_logo = paintutils.loadImage(v[1])
+        if pinestore_logo == nil then
+            pinestore_logo = paintutils.loadImage("gfx/nprov.nfp")
+        end
+        local logo_window = window.create(term.current(), currentX, currentY, imageWidth, imageHeight)
+        drawBuffer(pinestore_logo, logo_window)
+        
+        local x2, y2 = term.getCursorPos()
+        term.setCursorPos(currentX-1, currentY + imageHeight + 1)
+        term.write(trunc(v[2], 7))
+        term.setCursorPos(x2, y2)
+        
+        currentX = currentX + imageWidth + 4 -- Adjust this if you want more spacing
     end
-
-    local pinestore_logo = paintutils.loadImage(v[1])
-    if pinestore_logo == nil then
-        pinestore_logo = paintutils.loadImage("gfx/nprov.nfp")
-    end
-    local logo_window = window.create(term.current(), currentX, currentY, imageWidth, imageHeight)
-    drawBuffer(pinestore_logo, logo_window)
-    
-    local x2, y2 = term.getCursorPos()
-    term.setCursorPos(currentX-1, currentY + imageHeight + 1)
-    term.write(trunc(v[2], 7))
-    term.setCursorPos(x2, y2)
-    
-    currentX = currentX + imageWidth + 4 -- Adjust this if you want more spacing
 end
-sleep(1)
+redrawIcons()
+
+local crx = 1
+local cry = 1
+local width = 40
+local height = 25
+local win = window.create(term.current(), crx, cry, width, height)
+local name = "SEGE v1.0"
+
+win.setBackgroundColour(colours.white)
+win.setTextColour(colours.black)
+win.clear()
+
+local function drawback(name)
+    local x, y = win.getSize()
+    win.setCursorPos(1, 1)
+    win.setTextColour(colours.black)
+    win.setBackgroundColour(colours.white)
+    for i = 1, x do
+        win.write("=")
+    end
+
+    local newxpos = math.floor((x - #name) / 2) + 1
+
+    if newxpos > 1 then
+        win.setCursorPos(newxpos, 1)
+        win.write(name)
+    end
+
+    win.setCursorPos(x - 2, 1)
+    win.write(string.char(0x8C))
+
+    win.setTextColour(colours.white)
+    win.setBackgroundColour(colours.black)
+
+    win.setCursorPos(x - 1, 1)
+    win.write(string.char(0x84))
+    win.setCursorPos(x - 3, 1)
+    win.write(string.char(0x88))
+end
+
+local function redrawWindow(newCrx, newCry)
+    -- Clear the old window position
+    local winx, winy = win.getSize()
+    seclr(crx, cry, crx + winx - 1, cry + winy - 1)
+    
+    -- Update the new window position
+    crx = newCrx
+    cry = newCry
+    win.reposition(crx, cry)
+    
+    -- Redraw the window content
+    drawback(name)
+end
+
+local function listen()
+    while true do
+        local eventData = {os.pullEvent()}
+        local event = eventData[1]
+        local button = eventData[2]
+        local x2 = eventData[3]
+        local y2 = eventData[4]
+
+        if event == "mouse_click" then
+            if button == 1 and y2 == cry and (x2 >= crx + width - 4 and x2 <= crx + width - 1) then
+                term.clear()
+                seclr()
+                redrawIcons()
+            elseif button == 1 and y2 == cry and (x2 >= crx and x2 < crx + width - 4) then
+                dragging = true
+                dragOffsetX = x2 - crx
+                dragOffsetY = y2 - cry
+            end
+        elseif event == "mouse_up" then
+            dragging = false
+        elseif event == "mouse_drag" and dragging then
+            local newCrx = math.max(0, math.min(x2 - dragOffsetX, term.getSize() - width))
+            local newCry = math.max(0, math.min(y2 - dragOffsetY, term.getSize() - height))
+            redrawIcons()
+            redrawWindow(newCrx, newCry)
+        end
+    end
+end
+
+drawback(name)
+
+listen()
+
+term.setCursorPos(42, 25)
 end -- ends the terminal check "else"
