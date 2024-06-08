@@ -340,9 +340,8 @@ seclr()
 
 local allwin = {}
 local function swin(crx, cry, width, height, name, debug)
-    -- Ensure unique names in the allwin table
-    if allwin[name] then
-        return nil, "Window with the name '" .. name .. "' already exists."
+    for k,v in ipairs(allwin) do
+        if v[4] == name then return nil, "Window with the name '" .. name .. "' already exists." end
     end
 
     local win = window.create(term.current(), crx, cry, width, height)
@@ -395,13 +394,13 @@ local function swin(crx, cry, width, height, name, debug)
         drawback(name)
     end
 
-    allwin[name] = { redrawWindow, crx, cry } -- Register the window
+    table.insert(allwin,1,{ redrawWindow, crx, cry, name }) -- Register the window
 
     local function redrawAllWindows()
         if debug == false then
             seclr()
         end
-        for k, v in pairs(allwin) do
+        for k, v in ipairs(allwin) do
             local redr = v[1]
             redr(v[2], v[3])
         end
@@ -426,7 +425,9 @@ local function swin(crx, cry, width, height, name, debug)
                         seclr()
                         redrawIcons()
                     end
-                    allwin[name] = nil -- Remove the window
+                    for k,v in ipairs(allwin) do
+                        if v[4] == name then table.remove(allwin,k) end
+                    end
                     redrawAllWindows()
                     break
                 elseif button == 1 and y2 == cry and (x2 >= crx and x2 < crx + width - 4) then
@@ -439,8 +440,11 @@ local function swin(crx, cry, width, height, name, debug)
                     dragging = false
                     local newCrx = math.max(0, math.min(accumulatedCrx, term.getSize() - width))
                     local newCry = math.max(0, math.min(accumulatedCry, term.getSize() - height))
-    
-                    allwin[name] = { redrawWindow, newCrx, newCry }
+
+                    for k,v in ipairs(allwin) do
+                        if v[4] == name then allwin[k] = { redrawWindow, crx, cry, name } end
+                    end
+
                     redrawAllWindows()
                 end
             elseif event == "mouse_drag" and dragging then
