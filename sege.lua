@@ -309,9 +309,7 @@ local function swin(crx, cry, width, height, name, debug)
     table.insert(allwin,{ redrawWindow, crx, cry, name }) -- Register the window
 
     local function redrawAllWindows()
-        if debug == false then
-            seclr()
-        end
+
         for k, v in ipairs(allwin) do
             local redr = v[1]
             redr(v[2], v[3])
@@ -332,10 +330,12 @@ local function swin(crx, cry, width, height, name, debug)
     
             if event == "mouse_click" then
                 if button == 1 and y2 == cry and (x2 >= crx + width - 4 and x2 <= crx + width - 1) then
-                    term.clear()
                     if debug == false then
-                        seclr()
+                        local winx, winy = win.getSize()
+                        seclr(crx, cry, crx + winx, cry + winy)
                         redrawIcons()
+                    else
+                        term.clear()
                     end
                     for k,v in ipairs(allwin) do
                         if v[4] == name then table.remove(allwin,k) end
