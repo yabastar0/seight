@@ -257,7 +257,7 @@ local function swin(crx, cry, width, height, name, debug)
     end
 
     local win = window.create(term.current(), crx, cry, width, height)
-    local winmin = window.create(term.current(), crx, cry + 1, width, height - 1)
+    local winmin = window.create(win, 1, 2, width, height - 1)
 
     win.setBackgroundColour(colours.white)
     win.setTextColour(colours.black)
@@ -296,20 +296,18 @@ local function swin(crx, cry, width, height, name, debug)
     end
 
     local function redrawWindow(newCrx, newCry)
-        local winx, winy = win.getSize()
-        seclr(crx, cry, crx + winx, cry + winy)
+        --local winx, winy = win.getSize()
+        --seclr(crx, cry, crx + winx, cry + winy)
         
         crx = newCrx
         cry = newCry
         win.reposition(crx, cry)
-        winmin.reposition(crx, cry+1)
-        drawback(name)
     end
 
     table.insert(allwin,{ redrawWindow, crx, cry, name }) -- Register the window
 
     local function redrawAllWindows()
-
+        seclr()
         for k, v in ipairs(allwin) do
             local redr = v[1]
             redr(v[2], v[3])
