@@ -140,94 +140,6 @@ local function drawBuffer(buffer, win)
 	end
 end
 
--- PrimeUI by JackMacWindows
--- Public domain/CC0
-
-local expect = require "cc.expect".expect
-
--- Initialization code
-local PrimeUI = {}
-do
-    local coros = {}
-    local restoreCursor
-
-    --- Adds a task to run in the main loop.
-    ---@param func function The function to run, usually an `os.pullEvent` loop
-    function PrimeUI.addTask(func)
-        expect(1, func, "function")
-        local t = {coro = coroutine.create(func)}
-        coros[#coros+1] = t
-        _, t.filter = coroutine.resume(t.coro)
-    end
-
-    --- Sends the provided arguments to the run loop, where they will be returned.
-    ---@param ... any The parameters to send
-    function PrimeUI.resolve(...)
-        coroutine.yield(coros, ...)
-    end
-
-    --- Clears the screen and resets all components. Do not use any previously
-    --- created components after calling this function.
-    function PrimeUI.clear()
-        -- Reset the screen.
-        term.setCursorPos(1, 1)
-        term.setCursorBlink(false)
-        term.setBackgroundColor(colors.black)
-        term.setTextColor(colors.white)
-        term.clear()
-        -- Reset the task list and cursor restore function.
-        coros = {}
-        restoreCursor = nil
-    end
-
-    --- Sets or clears the window that holds where the cursor should be.
-    ---@param win window|nil The window to set as the active window
-    function PrimeUI.setCursorWindow(win)
-        expect(1, win, "table", "nil")
-        restoreCursor = win and win.restoreCursor
-    end
-
-    --- Gets the absolute position of a coordinate relative to a window.
-    ---@param win window The window to check
-    ---@param x number The relative X position of the point
-    ---@param y number The relative Y position of the point
-    ---@return number x The absolute X position of the window
-    ---@return number y The absolute Y position of the window
-    function PrimeUI.getWindowPos(win, x, y)
-        if win == term then return x, y end
-        while win ~= term.native() and win ~= term.current() do
-            if not win.getPosition then return x, y end
-            local wx, wy = win.getPosition()
-            x, y = x + wx - 1, y + wy - 1
-            _, win = debug.getupvalue(select(2, debug.getupvalue(win.isColor, 1)), 1) -- gets the parent window through an upvalue
-        end
-        return x, y
-    end
-
-    --- Runs the main loop, returning information on an action.
-    ---@return any ... The result of the coroutine that exited
-    function PrimeUI.run()
-        while true do
-            -- Restore the cursor and wait for the next event.
-            if restoreCursor then restoreCursor() end
-            local ev = table.pack(os.pullEvent())
-            -- Run all coroutines.
-            for _, v in ipairs(coros) do
-                if v.filter == nil or v.filter == ev[1] then
-                    -- Resume the coroutine, passing the current event.
-                    local res = table.pack(coroutine.resume(v.coro, table.unpack(ev, 1, ev.n)))
-                    -- If the call failed, bail out. Coroutines should never exit.
-                    if not res[1] then error(res[2], 2) end
-                    -- If the coroutine resolved, return its values.
-                    if res[2] == coros then return table.unpack(res, 3, res.n) end
-                    -- Set the next event filter.
-                    v.filter = res[2]
-                end
-            end
-        end
-    end
-end
-
 local f = fs.open("cfg/cfg", "r")
 local loc = textutils.unserialise(f.readAll())
 f.close()
@@ -345,7 +257,7 @@ local function swin(crx, cry, width, height, name, debug)
     end
 
     local win = window.create(term.current(), crx, cry, width, height)
-    local winmin = window.create(term.current(), crx, cry + 1, width, height - 1)
+    local winmin = window.create(win, 1, 2, width, height - 1)
 
     win.setBackgroundColour(colours.white)
     win.setTextColour(colours.black)
@@ -384,23 +296,19 @@ local function swin(crx, cry, width, height, name, debug)
     end
 
     local function redrawWindow(newCrx, newCry)
-        local winx, winy = win.getSize()
-        seclr(crx, cry, crx + winx - 1, cry + winy - 1)
+        --local winx, winy = win.getSize()
+        --seclr(crx, cry, crx + winx, cry + winy)
         
         crx = newCrx
         cry = newCry
         win.reposition(crx, cry)
-        winmin.reposition(crx, cry+1)
-        drawback(name)
     end
 
-    table.insert(allwin,1,{ redrawWindow, crx, cry, name }) -- Register the window
+    table.insert(allwin,{ redrawWindow, crx, cry, name }) -- Register the window
 
     local function redrawAllWindows()
-        if debug == false then
-            seclr()
-        end
-        for k, v in pairs(allwin) do
+        seclr()
+        for k, v in ipairs(allwin) do
             local redr = v[1]
             redr(v[2], v[3])
         end
@@ -420,12 +328,16 @@ local function swin(crx, cry, width, height, name, debug)
     
             if event == "mouse_click" then
                 if button == 1 and y2 == cry and (x2 >= crx + width - 4 and x2 <= crx + width - 1) then
-                    term.clear()
                     if debug == false then
-                        seclr()
+                        local winx, winy = win.getSize()
+                        seclr(crx, cry, crx + winx, cry + winy)
                         redrawIcons()
+                    else
+                        term.clear()
                     end
-                    allwin[name] = nil -- Remove the window
+                    for k,v in ipairs(allwin) do
+                        if v[4] == name then table.remove(allwin,k) end
+                    end
                     redrawAllWindows()
                     break
                 elseif button == 1 and y2 == cry and (x2 >= crx and x2 < crx + width - 4) then
@@ -438,8 +350,11 @@ local function swin(crx, cry, width, height, name, debug)
                     dragging = false
                     local newCrx = math.max(0, math.min(accumulatedCrx, term.getSize() - width))
                     local newCry = math.max(0, math.min(accumulatedCry, term.getSize() - height))
-    
-                    allwin[name] = { redrawWindow, newCrx, newCry }
+
+                    for k,v in ipairs(allwin) do
+                        if v[4] == name then table.remove(allwin,k) end
+                    end
+                    table.insert(allwin,{ redrawWindow, newCrx, newCry, name })
                     redrawAllWindows()
                 end
             elseif event == "mouse_drag" and dragging then
